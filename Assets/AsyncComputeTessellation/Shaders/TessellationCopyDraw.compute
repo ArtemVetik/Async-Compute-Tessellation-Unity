@@ -1,0 +1,19 @@
+#pragma kernel main
+
+#define COMPUTE_SHADER 1
+
+#include "Common.hlsl"
+
+[numthreads(1, 1, 1)]
+void main(uint3 id : SV_DispatchThreadID)
+{
+    DrawArgs[0] = SubdCounter[2] * gIndicesCount; // VertexCountPerInstance
+    DrawArgs[1] = 1; // InstanceCount    
+    DrawArgs[2] = 0; // StartVertexLocation
+    DrawArgs[3] = 0; // StartInstanceLocation
+    
+    SubdCounter[3] = SubdCounter[2];
+    SubdCounter[0] = SubdCounter[1];
+    SubdCounter[1] = 0;
+    SubdCounter[2] = 0;
+}
