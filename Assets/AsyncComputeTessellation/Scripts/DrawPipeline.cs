@@ -62,12 +62,14 @@ namespace AV.AsyncComputeTessellation
                 subdData[i] = new uint4(0, 0, 0, 0);
 
             _subdOut.SetData(subdData);
+            subdData.Dispose();
 
             var counterData = new NativeArray<uint>(4, Allocator.Temp);
             counterData[0] = (uint)triCount;
             counterData[1] = counterData[2] = counterData[3] = 0;
 
             _subdCounter.SetData(counterData);
+            counterData.Dispose();
 
             _meshVertex = new ComputeBuffer(_mesh.vertexCount, sizeof(Vertex), ComputeBufferType.Structured) { name = "MeshVertex" };
 
@@ -84,6 +86,7 @@ namespace AV.AsyncComputeTessellation
             }
 
             _meshVertex.SetData(vertices);
+            vertices.Dispose();
 
             _meshIndex = new ComputeBuffer(_mesh.GetIndices(0).Length, sizeof(uint));
             _meshIndex.name = nameof(_meshIndex);
@@ -164,6 +167,29 @@ namespace AV.AsyncComputeTessellation
             _pingPongCounter = 1 - _pingPongCounter;
 
             cmd.Release();
+        }
+
+        private void OnDestroy()
+        {
+            _subdIn.Dispose();
+            _subdOut.Dispose();
+            _subdOutCulled.Dispose();
+
+            for (int i = 0; i < 2; i++)
+            {
+                _vsPrepassV[i].Dispose();
+                _vsPrepassIdx[i].Dispose();
+                _drawArgs[i].Dispose();
+            }
+
+            _subdCounter.Dispose();
+            _leafMeshVertex.Dispose();
+            _leafMeshIndex.Dispose();
+            _meshVertex.Dispose();
+            _meshIndex.Dispose();
+            _objectCB.Dispose();
+            _tessellationCB.Dispose();
+            _frameCB.Dispose();
         }
     }
 }
