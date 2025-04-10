@@ -61,11 +61,8 @@ namespace AV.AsyncComputeTessellation
 
     internal unsafe struct PerFrameData
     {
-        public float4x4 ViewProj;
-        public float3 CamPosition;
-        public float DeltaTime;
         public float3 PredictedCamPosition;
-        public float TotalTime;
+        public uint Padding;
         public fixed float FrustrumPlanes[4 * 6]; // float4 x 6
     };
 

@@ -104,20 +104,11 @@ namespace AV.AsyncComputeTessellation
             var objData = ObjectData.CreateDefault();
             var tessData = TessellationData.CreateDefault();
 
-            PerFrameData perFrameData;
-            perFrameData.ViewProj = Camera.main.projectionMatrix * Camera.main.worldToCameraMatrix;
-            perFrameData.CamPosition = Camera.main.transform.position;
-            perFrameData.PredictedCamPosition = Camera.main.transform.position;
-            perFrameData.DeltaTime = Time.deltaTime;
-            perFrameData.TotalTime = Time.time;
-            // TODO: perFrameData.FrustrumPlanes = ...
-
             // TODO: Use NativeArray instead of List
             _objectCB = new ComputeBuffer(1, sizeof(ObjectData), ComputeBufferType.Constant) { name = "ObjectCB" };
             _objectCB.SetData(new List<ObjectData>() { objData });
 
             _frameCB = new ComputeBuffer(1, sizeof(PerFrameData), ComputeBufferType.Constant, ComputeBufferMode.Dynamic) { name = "FrameCB" };
-            _frameCB.SetData(new List<PerFrameData>() { perFrameData });
 
             _tessellationCB = new ComputeBuffer(1, sizeof(TessellationData), ComputeBufferType.Constant) { name = "TessellationCB" };
             _tessellationCB.SetData(new List<TessellationData>() { tessData });
@@ -145,14 +136,27 @@ namespace AV.AsyncComputeTessellation
             cmd.SetGlobalBuffer("MeshDataIndex", _meshIndex);
             cmd.SetGlobalBuffer("LeafVertex", _leafMeshVertex);
             cmd.SetGlobalBuffer("LeafIndex", _leafMeshIndex);
-
-            PerFrameData perFrameData;
-            perFrameData.ViewProj = Camera.main.projectionMatrix * Camera.main.worldToCameraMatrix;
-            perFrameData.CamPosition = Camera.main.transform.position;
+            
+            PerFrameData perFrameData = default;
             perFrameData.PredictedCamPosition = Camera.main.transform.position;
-            perFrameData.DeltaTime = Time.deltaTime;
-            perFrameData.TotalTime = Time.time;
+            
+            Plane[] frustumPlanes = new Plane[6];
+            
+            Matrix4x4 viewProjMatrix = Camera.main.projectionMatrix * Camera.main.worldToCameraMatrix;
+            GeometryUtility.CalculateFrustumPlanes(viewProjMatrix, frustumPlanes);
+            
+            for (int i = 0; i < 6; i++)
+            {
+                Vector3 normal = frustumPlanes[i].normal;
+                float distance = frustumPlanes[i].distance;
 
+                int offset = i * 4;
+                perFrameData.FrustrumPlanes[offset + 0] = normal.x;
+                perFrameData.FrustrumPlanes[offset + 1] = normal.y;
+                perFrameData.FrustrumPlanes[offset + 2] = normal.z;
+                perFrameData.FrustrumPlanes[offset + 3] = distance;
+            }
+            
             _frameCB.SetData(new List<PerFrameData>() { perFrameData });
 
             cmd.SetGlobalConstantBuffer(_objectCB, "UnityObjectData", 0, sizeof(ObjectData));

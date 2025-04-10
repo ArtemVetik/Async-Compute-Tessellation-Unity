@@ -23,18 +23,15 @@ CBUFFER_START(UnityTessellationData)
 CBUFFER_END
 
 CBUFFER_START(UnityPerFrameData)
-    float4x4 gViewProj;
-    float3 gCamPosition;
-    float gDeltaTime;
     float3 gPredictedCamPosition;
-    float gTotalTime;
+    uint gPadding1;
     float4 gFrustrumPlanes[6];
 CBUFFER_END
 
 CBUFFER_START(UnityShadowMapData)
     float4x4 gShadowViewProj;
     float3 gLightPos;
-    float gPadding1;
+    float gPadding2;
 CBUFFER_END
 
 #endif

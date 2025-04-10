@@ -4,7 +4,7 @@
 float displace(float2 p, float screen_resolution)
 {
     p *= gDisplacePosScale;
-    p += gTotalTime * 0.5 * gWavesAnimationFlag;
+    p += _Time.y * 0.5 * gWavesAnimationFlag;
     
     const float max_octaves = 16.0;
     float frequency = 1.5;
@@ -24,7 +24,7 @@ float displace(float2 p, float screen_resolution)
 float displace(float2 p, float screen_resolution, out float2 gradient)
 {   
     p *= gDisplacePosScale;
-    p += gTotalTime * 0.5 * gWavesAnimationFlag;
+    p += _Time.y * 0.5 * gWavesAnimationFlag;
     const float max_octaves = 16.0;
     float frequency = 1.5;
     float octaves = clamp(log2(screen_resolution) - 2.0, 0.0, max_octaves);

@@ -43,9 +43,9 @@ void cullPass(uint4 key)
     b_max = max(b_max, mesh_coord[O]);
     b_max = max(b_max, mesh_coord[U]);
     b_max = max(b_max, mesh_coord[R]);
-    
-    FTYPE4x4 mvp = mul(gWorld, gViewProj);
-    //if (culltest(mvp, b_min.xyz, b_max.xyz))
+
+    FTYPE4x4 mvp = mul(gWorld, unity_MatrixVP);
+    if (culltest(mvp, b_min.xyz, b_max.xyz))
         cull_writeKey(key);
 }
 void compute_writeKey(uint2 new_nodeID, uint4 current_key)
