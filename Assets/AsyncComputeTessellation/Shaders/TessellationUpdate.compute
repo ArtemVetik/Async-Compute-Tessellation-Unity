@@ -2,6 +2,7 @@
 
 #define COMPUTE_SHADER 1
 
+#include_with_pragmas "MultiCompile.hlsl"
 #include "LoD.hlsl"
 #include "Noise.hlsl"
 
@@ -29,7 +30,7 @@ void cullPass(uint4 key)
     mesh_coord[U] = ts_Leaf_to_MeshPosition(unit_U, key);
     mesh_coord[R] = ts_Leaf_to_MeshPosition(unit_R, key);
     
-#if USE_DISPLACE
+#ifdef USE_DISPLACE
     mesh_coord[O] = displaceVertex(mesh_coord[O], gPredictedCamPosition);
     mesh_coord[U] = displaceVertex(mesh_coord[U], gPredictedCamPosition);
     mesh_coord[R] = displaceVertex(mesh_coord[R], gPredictedCamPosition);
@@ -60,7 +61,7 @@ void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
     uint4 key = SubdBufferIn[id.x];
     uint2 nodeID = key.xy;
     
-#if USE_DISPLACE
+#ifdef USE_DISPLACE
     // When subdividing heightfield, we set the plane height to the heightmap
     // value under the camera for more fidelity.
     // To avoid computing the procedural height value in each instance, we
@@ -76,12 +77,12 @@ void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
         return;
     
     int targetLod = 0, parentLod = 0;
-#if UNIFORM_TESSELLATION
+#ifdef UNIFORM_TESSELLATION
     targetLod = gSubdivisionLevel;
     parentLod = gSubdivisionLevel;
 #else 
     FTYPE parentTargetLevel, targetLevel;
-#if USE_DISPLACE
+#ifdef USE_DISPLACE
     computeTessLvlWithParent(key, cam_height_local, targetLevel, parentTargetLevel);
 #else
     computeTessLvlWithParent(key, targetLevel, parentTargetLevel);

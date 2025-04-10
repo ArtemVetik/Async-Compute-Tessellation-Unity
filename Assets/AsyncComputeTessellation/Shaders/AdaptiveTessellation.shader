@@ -10,6 +10,7 @@ Shader "Unlit/AdaptiveTessellation" {
             #pragma fragment frag
             #pragma target 5.0
 
+            #include_with_pragmas "MultiCompile.hlsl"
             #include "DefaultShaderData.hlsl"
             #include "UnityCG.cginc"
 

@@ -121,6 +121,9 @@ namespace AV.AsyncComputeTessellation
 
             _tessellationCB = new ComputeBuffer(1, sizeof(TessellationData), ComputeBufferType.Constant) { name = "TessellationCB" };
             _tessellationCB.SetData(new List<TessellationData>() { tessData });
+
+            _updateCS.EnableKeyword("USE_DISPLACE");
+            _vsPrepassCS.EnableKeyword("USE_DISPLACE");
         }
 
         private unsafe void OnRenderObject()

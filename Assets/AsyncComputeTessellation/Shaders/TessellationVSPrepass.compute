@@ -2,6 +2,7 @@
 
 #define COMPUTE_SHADER 1
 
+#include_with_pragmas "MultiCompile.hlsl"
 #include "ConstantBuffers.hlsl"
 #include "ComputeShaderData.hlsl"
 #include "Common.hlsl"
@@ -31,7 +32,7 @@ void main(uint id : SV_DispatchThreadID)
     
     float4 posW = mul(vertex.Position, gWorld);
     
-#if USE_DISPLACE
+#ifdef USE_DISPLACE
     posW = float4(displaceVertex(posW.xyz, gCamPosition), 1);
 #endif
     
