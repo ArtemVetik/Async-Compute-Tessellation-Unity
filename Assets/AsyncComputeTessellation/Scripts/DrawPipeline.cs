@@ -1,8 +1,6 @@
-using System.Collections.Generic;
-using Unity.Collections;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using System.Runtime.InteropServices;
 
 namespace AV.AsyncComputeTessellation
 {
@@ -13,111 +11,42 @@ namespace AV.AsyncComputeTessellation
         [SerializeField] private ComputeShader _vsPrepassCS;
         [SerializeField] private Mesh _mesh;
         [SerializeField] private Material _material;
+        [SerializeField] private TessellationParamUI _ui;
 
         private int _pingPongCounter = 0;
         private int _subdCulledBuffIdx = 0;
 
-        private ComputeBuffer _subdIn;
-        private ComputeBuffer _subdOut;
-        private ComputeBuffer _subdOutCulled;
-        private ComputeBuffer[] _vsPrepassV = new ComputeBuffer[2];
-        private ComputeBuffer[] _vsPrepassIdx = new ComputeBuffer[2];
-        private ComputeBuffer[] _drawArgs = new ComputeBuffer[2];
+        private SubdivisionBuffers _subdBuffers;
+        private TesselationMeshBuffer _tessellationMeshBuffer;
+        private TessellationParamCB _tessellationParam;
+        private LeafMesh _leafMesh;
+        private TessellationShaderVariants _shaderVariants;
+        private ObjectCB _objectCB;
+        private FrameCB _frameCB;
 
-        private ComputeBuffer _subdCounter;
-        private ComputeBuffer _leafMeshVertex;
-        private ComputeBuffer _leafMeshIndex;
-        private ComputeBuffer _meshVertex;
-        private ComputeBuffer _meshIndex;
-
-        private ComputeBuffer _objectCB;
-        private ComputeBuffer _tessellationCB;
-        private ComputeBuffer _frameCB;
-
-        private unsafe void Start()
+        private void Start()
         {
-            int subdSize = 1000000;
+            _subdBuffers = new SubdivisionBuffers();
+            _subdBuffers.Build(_mesh.GetIndices(0).Length / 3);
 
-            _subdIn = new ComputeBuffer(subdSize, sizeof(uint4), ComputeBufferType.Structured) { name = "SubdIn" };
-            _subdOut = new ComputeBuffer(subdSize, sizeof(uint4), ComputeBufferType.Structured) { name = "SubdOut" };
-            _subdOutCulled = new ComputeBuffer(subdSize, sizeof(uint4), ComputeBufferType.Structured) { name = "SubdOutCulled" };
-            _subdCounter = new ComputeBuffer(4, sizeof(uint), ComputeBufferType.Structured) { name = "SubdCounter" };
+            _tessellationMeshBuffer = new TesselationMeshBuffer();
+            _tessellationMeshBuffer.Build(_mesh);
+            
+            _tessellationParam = new TessellationParamCB(_tessellationMeshBuffer);
+            
+            _leafMesh = new LeafMesh();
+            _leafMesh.Build(_tessellationParam.Data.CPULodLevel);
 
-            for (int i = 0; i < 2; i++)
-            {
-                _vsPrepassV[i] = new ComputeBuffer(subdSize, sizeof(VertexOut), ComputeBufferType.Structured) { name = $"VsPrepassV-{i}" };
-                _vsPrepassIdx[i] = new ComputeBuffer(subdSize, sizeof(uint), ComputeBufferType.Structured) { name = $"VsPrepassIdx-{i}" };
-                _drawArgs[i] = new ComputeBuffer(4, sizeof(uint), ComputeBufferType.IndirectArguments) { name = $"DrawArgs-{i}" };
-            }
+            _shaderVariants = new TessellationShaderVariants(new[] { _updateCS, _vsPrepassCS, _copyDrawCS });
+            _shaderVariants.UpdateKeywords(_tessellationParam);
 
-            var triCount = _mesh.GetIndices(0).Length / 3;
-            var subdData = new NativeArray<uint4>(triCount + 1, Allocator.Temp);
-
-            for (int i = 0; i < triCount; i++)
-                subdData[i] = new uint4(0, 0x1, (uint)i * 3, 1);
-
-            _subdIn.SetData(subdData);
-
-            for (int i = 0; i < triCount; i++)
-                subdData[i] = new uint4(0, 0, 0, 0);
-
-            _subdOut.SetData(subdData);
-            subdData.Dispose();
-
-            var counterData = new NativeArray<uint>(4, Allocator.Temp);
-            counterData[0] = (uint)triCount;
-            counterData[1] = counterData[2] = counterData[3] = 0;
-
-            _subdCounter.SetData(counterData);
-            counterData.Dispose();
-
-            _meshVertex = new ComputeBuffer(_mesh.vertexCount, sizeof(Vertex), ComputeBufferType.Structured) { name = "MeshVertex" };
-
-            var vertices = new NativeArray<Vertex>(_mesh.vertexCount, Allocator.Temp);
-            for (int i = 0; i < _mesh.vertexCount; i++)
-            {
-                vertices[i] = new Vertex()
-                {
-                    Position = new float4(_mesh.vertices[i].x, _mesh.vertices[i].y, _mesh.vertices[i].z, 0),
-                    Normal = new float4(_mesh.normals[i].x, _mesh.normals[i].y, _mesh.normals[i].z, 0),
-                    TangentU = _mesh.tangents[i],
-                    TexC = new float4(_mesh.uv[i].x, _mesh.uv[i].y, 0, 0)
-                };
-            }
-
-            _meshVertex.SetData(vertices);
-            vertices.Dispose();
-
-            _meshIndex = new ComputeBuffer(_mesh.GetIndices(0).Length, sizeof(uint));
-            _meshIndex.name = nameof(_meshIndex);
-            _meshIndex.SetData(_mesh.GetIndices(0));
-
-            var leafVertices = LeafMesh.GetLeafVertices(0);
-            var leafIndices = LeafMesh.GetLeafIndices(0);
-
-            _leafMeshVertex = new ComputeBuffer(leafVertices.Count, sizeof(float2)) { name = "LeafMeshVertex" };
-            _leafMeshIndex = new ComputeBuffer(leafIndices.Count, sizeof(uint)) { name = "LeafMeshIndex" };
-
-            _leafMeshVertex.SetData(leafVertices);
-            _leafMeshIndex.SetData(leafIndices);
-
-            var objData = ObjectData.CreateDefault();
-            var tessData = TessellationData.CreateDefault();
-
-            // TODO: Use NativeArray instead of List
-            _objectCB = new ComputeBuffer(1, sizeof(ObjectData), ComputeBufferType.Constant) { name = "ObjectCB" };
-            _objectCB.SetData(new List<ObjectData>() { objData });
-
-            _frameCB = new ComputeBuffer(1, sizeof(PerFrameData), ComputeBufferType.Constant, ComputeBufferMode.Dynamic) { name = "FrameCB" };
-
-            _tessellationCB = new ComputeBuffer(1, sizeof(TessellationData), ComputeBufferType.Constant) { name = "TessellationCB" };
-            _tessellationCB.SetData(new List<TessellationData>() { tessData });
-
-            _updateCS.EnableKeyword("USE_DISPLACE");
-            _vsPrepassCS.EnableKeyword("USE_DISPLACE");
+            _objectCB = new ObjectCB();
+            _frameCB = new FrameCB();
+            
+            _ui.Initialize(_tessellationParam, _leafMesh, _shaderVariants);
         }
 
-        private unsafe void OnRenderObject()
+        private void OnRenderObject()
         {
             int kernelHandleUpd = _updateCS.FindKernel("main");
             int kernelHandlePrepass = _vsPrepassCS.FindKernel("main");
@@ -125,49 +54,29 @@ namespace AV.AsyncComputeTessellation
 
             CommandBuffer cmd = new CommandBuffer { name = "Adaptive Tessellation" };
 
-            cmd.SetGlobalBuffer("SubdBufferIn", _pingPongCounter == 0 ? _subdIn : _subdOut);
-            cmd.SetGlobalBuffer("SubdBufferOut", _pingPongCounter == 0 ? _subdOut : _subdIn);
-            cmd.SetGlobalBuffer("SubdBufferOutCulled", _subdOutCulled);
-            cmd.SetGlobalBuffer("PrepassVertexOut", _subdCulledBuffIdx == 0 ? _vsPrepassV[0] : _vsPrepassV[1]);
-            cmd.SetGlobalBuffer("PrepassIndexOut", _subdCulledBuffIdx == 0 ? _vsPrepassIdx[0] : _vsPrepassIdx[1]);
-            cmd.SetGlobalBuffer("SubdCounter", _subdCounter);
-            cmd.SetGlobalBuffer("DrawArgs", _subdCulledBuffIdx == 0 ? _drawArgs[0] : _drawArgs[1]);
-            cmd.SetGlobalBuffer("MeshDataVertex", _meshVertex);
-            cmd.SetGlobalBuffer("MeshDataIndex", _meshIndex);
-            cmd.SetGlobalBuffer("LeafVertex", _leafMeshVertex);
-            cmd.SetGlobalBuffer("LeafIndex", _leafMeshIndex);
-            
-            PerFrameData perFrameData = default;
-            perFrameData.PredictedCamPosition = Camera.main.transform.position;
-            
-            Plane[] frustumPlanes = new Plane[6];
-            
-            Matrix4x4 viewProjMatrix = Camera.main.projectionMatrix * Camera.main.worldToCameraMatrix;
-            GeometryUtility.CalculateFrustumPlanes(viewProjMatrix, frustumPlanes);
-            
-            for (int i = 0; i < 6; i++)
-            {
-                Vector3 normal = frustumPlanes[i].normal;
-                float distance = frustumPlanes[i].distance;
+            cmd.SetGlobalBuffer("SubdBufferIn", _pingPongCounter == 0 ? _subdBuffers.SubdIn : _subdBuffers.SubdOut);
+            cmd.SetGlobalBuffer("SubdBufferOut", _pingPongCounter == 0 ? _subdBuffers.SubdOut : _subdBuffers.SubdIn);
+            cmd.SetGlobalBuffer("SubdBufferOutCulled", _subdBuffers.SubdOutCulled);
+            cmd.SetGlobalBuffer("PrepassVertexOut", _subdCulledBuffIdx == 0 ? _subdBuffers.PrepassV(0) : _subdBuffers.PrepassV(1));
+            cmd.SetGlobalBuffer("PrepassIndexOut", _subdCulledBuffIdx == 0 ? _subdBuffers.PrepassIdx(0) : _subdBuffers.PrepassIdx(1));
+            cmd.SetGlobalBuffer("SubdCounter", _subdBuffers.SubdCounter);
+            cmd.SetGlobalBuffer("DrawArgs", _subdCulledBuffIdx == 0 ? _subdBuffers.DrawArgs(0) : _subdBuffers.DrawArgs(1));
+            cmd.SetGlobalBuffer("MeshDataVertex", _tessellationMeshBuffer.VertexBuffer);
+            cmd.SetGlobalBuffer("MeshDataIndex", _tessellationMeshBuffer.IndexBuffer);
+            cmd.SetGlobalBuffer("LeafVertex", _leafMesh.Vertices);
+            cmd.SetGlobalBuffer("LeafIndex", _leafMesh.Indices);
 
-                int offset = i * 4;
-                perFrameData.FrustrumPlanes[offset + 0] = normal.x;
-                perFrameData.FrustrumPlanes[offset + 1] = normal.y;
-                perFrameData.FrustrumPlanes[offset + 2] = normal.z;
-                perFrameData.FrustrumPlanes[offset + 3] = distance;
-            }
+            _frameCB.Update();
             
-            _frameCB.SetData(new List<PerFrameData>() { perFrameData });
-
-            cmd.SetGlobalConstantBuffer(_objectCB, "UnityObjectData", 0, sizeof(ObjectData));
-            cmd.SetGlobalConstantBuffer(_tessellationCB, "UnityTessellationData", 0, sizeof(TessellationData));
-            cmd.SetGlobalConstantBuffer(_frameCB, "UnityPerFrameData", 0, sizeof(PerFrameData));
+            cmd.SetGlobalConstantBuffer(_objectCB.Cb, "UnityObjectData", 0, Marshal.SizeOf<ObjectData>());
+            cmd.SetGlobalConstantBuffer(_tessellationParam.Buffer, "UnityTessellationData", 0, Marshal.SizeOf<TessellationParams.ConstantBuffer>());
+            cmd.SetGlobalConstantBuffer(_frameCB.Buffer, "UnityPerFrameData", 0, Marshal.SizeOf<PerFrameData>());
 
             cmd.DispatchCompute(_updateCS, kernelHandleUpd, 10000, 1, 1);
             cmd.DispatchCompute(_vsPrepassCS, kernelHandlePrepass, 65000, 1, 1);
             cmd.DispatchCompute(_copyDrawCS, kernelHandleCopyDraw, 1, 1, 1);
 
-            cmd.DrawProceduralIndirect(Matrix4x4.identity, _material, 0, MeshTopology.Triangles, _drawArgs[0]);
+            cmd.DrawProceduralIndirect(Matrix4x4.identity, _material, 0, MeshTopology.Triangles, _subdBuffers.DrawArgs(0));
 
             Graphics.ExecuteCommandBuffer(cmd);
 
@@ -178,24 +87,12 @@ namespace AV.AsyncComputeTessellation
 
         private void OnDestroy()
         {
-            _subdIn.Dispose();
-            _subdOut.Dispose();
-            _subdOutCulled.Dispose();
-
-            for (int i = 0; i < 2; i++)
-            {
-                _vsPrepassV[i].Dispose();
-                _vsPrepassIdx[i].Dispose();
-                _drawArgs[i].Dispose();
-            }
-
-            _subdCounter.Dispose();
-            _leafMeshVertex.Dispose();
-            _leafMeshIndex.Dispose();
-            _meshVertex.Dispose();
-            _meshIndex.Dispose();
+            _subdBuffers.Dispose();
+            _tessellationMeshBuffer.Dispose();
+            _tessellationParam.Dispose();
+            _leafMesh.Dispose();
+            
             _objectCB.Dispose();
-            _tessellationCB.Dispose();
             _frameCB.Dispose();
         }
     }

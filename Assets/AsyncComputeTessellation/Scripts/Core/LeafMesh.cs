@@ -1,16 +1,43 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace AV.AsyncComputeTessellation
 {
-    internal class LeafMesh
+    internal class LeafMesh : IDisposable
     {
-        public static List<float2> GetLeafVertices(int level)
+        private ComputeBuffer _leafMeshVertex;
+        private ComputeBuffer _leafMeshIndex;
+
+        private int _level;
+
+        public ComputeBuffer Vertices => _leafMeshVertex;
+        public ComputeBuffer Indices => _leafMeshIndex;
+
+        public void Build(int level)
+        {
+            _level = level;
+
+            _leafMeshVertex?.Dispose();
+            _leafMeshIndex?.Dispose();
+
+            var leafVertices = GetLeafVertices();
+            var leafIndices = GetLeafIndices();
+
+            _leafMeshVertex = new ComputeBuffer(leafVertices.Count, Marshal.SizeOf<float2>()) { name = "LeafMeshVertex" };
+            _leafMeshIndex = new ComputeBuffer(leafIndices.Count, sizeof(uint)) { name = "LeafMeshIndex" };
+
+            _leafMeshVertex.SetData(leafVertices);
+            _leafMeshIndex.SetData(leafIndices);
+        }
+
+        private List<float2> GetLeafVertices()
         {
             var vertices = new List<float2>();
 
-            float numRow = 1 << level;
+            float numRow = 1 << _level;
             float col = 0.0f, row = 0.0f;
             float d = 1.0f / numRow;
 
@@ -21,6 +48,7 @@ namespace AV.AsyncComputeTessellation
                     vertices.Add(new float2(col * d, 1.0f - row * d));
                     col++;
                 }
+
                 row++;
                 col = 0;
             }
@@ -28,13 +56,13 @@ namespace AV.AsyncComputeTessellation
             return vertices;
         }
 
-        public static List<uint> GetLeafIndices(int level)
+        private List<uint> GetLeafIndices()
         {
             var indices = new List<uint>();
             uint col = 0, row = 0;
             uint elem = 0, numCol = 1;
             uint orientation;
-            int numRow = 1 << level;
+            int numRow = 1 << _level;
 
             Func<uint, uint3> newTriangle = (uint orientation) =>
             {
@@ -69,14 +97,23 @@ namespace AV.AsyncComputeTessellation
                         indices.Add(t.z);
                         orientation = (orientation + 1) % 4;
                     }
+
                     col++;
                     elem++;
                 }
+
                 col = 0;
                 numCol++;
                 row++;
             }
+
             return indices;
+        }
+
+        public void Dispose()
+        {
+            _leafMeshVertex?.Dispose();
+            _leafMeshIndex?.Dispose();
         }
     }
 }

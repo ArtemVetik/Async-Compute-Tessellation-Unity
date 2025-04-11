@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace AV.AsyncComputeTessellation
@@ -27,7 +28,8 @@ namespace AV.AsyncComputeTessellation
             var upDown = Input.GetKey(KeyCode.Q) ? -1.0f : Input.GetKey(KeyCode.E) ? 1.0f : 0.0f;
             upDown *= _moveSpeed * moveMult * Time.deltaTime;
 
-            _targetPosition = transform.position + transform.forward * vertical + transform.right * horizontal + Vector3.up * upDown;
+            _targetPosition = transform.position + transform.forward * vertical + transform.right * horizontal +
+                              Vector3.up * upDown;
             if (Input.GetMouseButton(1))
             {
                 var eulerAngles = transform.eulerAngles;
@@ -37,7 +39,7 @@ namespace AV.AsyncComputeTessellation
 
                 _targetRotation = Quaternion.Euler(eulerAngles);
             }
-            
+
             transform.position = Vector3.Lerp(transform.position, _targetPosition, _moveLerp * Time.deltaTime);
             transform.rotation = Quaternion.Lerp(transform.rotation, _targetRotation, _rotateLerp * Time.deltaTime);
         }
