@@ -13,11 +13,11 @@ float displace(float2 p, float screen_resolution)
 
     for (float i = 0.0; i < octaves - 1.0; i += 1.0)
     {
-        value += SimplexPerlin2D(p) * pow(frequency, -gDisplaceH);
+        value += SimplexPerlin2D(p) * pow(abs(frequency), -gDisplaceH);
         p *= gDisplaceLacunarity;
         frequency *= gDisplaceLacunarity;
     }
-    value += frac(octaves) * SimplexPerlin2D(p) * pow(frequency, -gDisplaceH);
+    value += frac(octaves) * SimplexPerlin2D(p) * pow(abs(frequency), -gDisplaceH);
     return value;
 }
 

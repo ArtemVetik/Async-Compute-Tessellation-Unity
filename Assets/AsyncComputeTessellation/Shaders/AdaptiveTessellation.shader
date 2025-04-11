@@ -53,7 +53,7 @@ Shader "Unlit/AdaptiveTessellation" {
                 output.PosW = vIn.PosW;
                 output.NormalW = vIn.NormalW;
                 output.TexC = vIn.TexC;
-                output.LeafPos = vIn.LeafPos;
+                output.LeafPos = float2((vertexID % 3) >> 1, (vertexID % 3) & 1);
                 output.Lvl = vIn.Lvl;
 
                 return output;

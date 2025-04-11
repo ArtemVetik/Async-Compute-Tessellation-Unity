@@ -44,7 +44,7 @@ void main(uint id : SV_DispatchThreadID)
     uint triangleId = gTrianglesCount * instanceID + indexId;
     
     output.Lvl = ts_findMSB_64(key.xy);
-    output.LeafPos = float2((triangleId % 3) >> 1, (triangleId % 3) & 1);
+    output.LeafPos = 0;
     output.Padding0 = 0;
     
     PrepassVertexOut[triangleId] = output;

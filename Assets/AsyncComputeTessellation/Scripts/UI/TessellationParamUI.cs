@@ -68,7 +68,7 @@ namespace AV.AsyncComputeTessellation
                 initTessData = true;
             
             if (buildPso) _variants.UpdateKeywords(_cb);
-            if (updateLeafMesh) _leafMesh.Build(_cb.Data.CPULodLevel);
+            if (updateLeafMesh) _leafMesh.Build(_cb.Data.CPULodLevel, ref _cb.Data.CB.IndicesCount, ref _cb.Data.CB.TrianglesCount);
             if (initTessData) _cb.UploadData();
         }
         

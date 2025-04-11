@@ -16,7 +16,7 @@ namespace AV.AsyncComputeTessellation
         public ComputeBuffer Vertices => _leafMeshVertex;
         public ComputeBuffer Indices => _leafMeshIndex;
 
-        public void Build(int level)
+        public void Build(int level, ref uint indicesCount, ref uint trianglesCount)
         {
             _level = level;
 
@@ -26,6 +26,9 @@ namespace AV.AsyncComputeTessellation
             var leafVertices = GetLeafVertices();
             var leafIndices = GetLeafIndices();
 
+            indicesCount = (uint)leafIndices.Count;
+            trianglesCount = (uint)leafVertices.Count;
+            
             _leafMeshVertex = new ComputeBuffer(leafVertices.Count, Marshal.SizeOf<float2>()) { name = "LeafMeshVertex" };
             _leafMeshIndex = new ComputeBuffer(leafIndices.Count, sizeof(uint)) { name = "LeafMeshIndex" };
 

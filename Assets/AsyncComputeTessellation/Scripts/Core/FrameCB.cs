@@ -38,7 +38,7 @@ namespace AV.AsyncComputeTessellation
             GeometryUtility.CalculateFrustumPlanes(viewProjMatrix, _frustumPlanes);
             
             perFrameData.FrustrumPlane1 = new float4(_frustumPlanes[0].normal.x, _frustumPlanes[0].normal.y, _frustumPlanes[0].normal.z, _frustumPlanes[0].distance);
-            perFrameData.FrustrumPlane2 = new float4(_frustumPlanes[1].normal.x, _frustumPlanes[1].normal.y, _frustumPlanes[1].normal.z, _frustumPlanes[2].distance);
+            perFrameData.FrustrumPlane2 = new float4(_frustumPlanes[1].normal.x, _frustumPlanes[1].normal.y, _frustumPlanes[1].normal.z, _frustumPlanes[1].distance);
             perFrameData.FrustrumPlane3 = new float4(_frustumPlanes[2].normal.x, _frustumPlanes[2].normal.y, _frustumPlanes[2].normal.z, _frustumPlanes[2].distance);
             perFrameData.FrustrumPlane4 = new float4(_frustumPlanes[3].normal.x, _frustumPlanes[3].normal.y, _frustumPlanes[3].normal.z, _frustumPlanes[3].distance);
             perFrameData.FrustrumPlane5 = new float4(_frustumPlanes[4].normal.x, _frustumPlanes[4].normal.y, _frustumPlanes[4].normal.z, _frustumPlanes[4].distance);

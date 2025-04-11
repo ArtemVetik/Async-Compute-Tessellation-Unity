@@ -35,7 +35,7 @@ namespace AV.AsyncComputeTessellation
             _tessellationParam = new TessellationParamCB(_tessellationMeshBuffer);
             
             _leafMesh = new LeafMesh();
-            _leafMesh.Build(_tessellationParam.Data.CPULodLevel);
+            _leafMesh.Build(_tessellationParam.Data.CPULodLevel, ref _tessellationParam.Data.CB.IndicesCount, ref _tessellationParam.Data.CB.TrianglesCount);
 
             _shaderVariants = new TessellationShaderVariants(new[] { _updateCS, _vsPrepassCS, _copyDrawCS });
             _shaderVariants.UpdateKeywords(_tessellationParam);
