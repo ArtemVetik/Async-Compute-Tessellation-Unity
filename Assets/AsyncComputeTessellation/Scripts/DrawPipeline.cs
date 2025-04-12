@@ -48,41 +48,54 @@ namespace AV.AsyncComputeTessellation
 
         private void OnRenderObject()
         {
+            _subdCulledBuffIdx = 1 - _subdCulledBuffIdx;
+            
             int kernelHandleUpd = _updateCS.FindKernel("main");
             int kernelHandlePrepass = _vsPrepassCS.FindKernel("main");
             int kernelHandleCopyDraw = _copyDrawCS.FindKernel("main");
 
-            CommandBuffer cmd = new CommandBuffer { name = "Adaptive Tessellation" };
+            CommandBuffer computeCmd = new CommandBuffer { name = "Adaptive Tessellation" };
 
-            cmd.SetGlobalBuffer("SubdBufferIn", _pingPongCounter == 0 ? _subdBuffers.SubdIn : _subdBuffers.SubdOut);
-            cmd.SetGlobalBuffer("SubdBufferOut", _pingPongCounter == 0 ? _subdBuffers.SubdOut : _subdBuffers.SubdIn);
-            cmd.SetGlobalBuffer("SubdBufferOutCulled", _subdBuffers.SubdOutCulled);
-            cmd.SetGlobalBuffer("PrepassVertexOut", _subdCulledBuffIdx == 0 ? _subdBuffers.PrepassV(0) : _subdBuffers.PrepassV(1));
-            cmd.SetGlobalBuffer("PrepassIndexOut", _subdCulledBuffIdx == 0 ? _subdBuffers.PrepassIdx(0) : _subdBuffers.PrepassIdx(1));
-            cmd.SetGlobalBuffer("SubdCounter", _subdBuffers.SubdCounter);
-            cmd.SetGlobalBuffer("DrawArgs", _subdCulledBuffIdx == 0 ? _subdBuffers.DrawArgs(0) : _subdBuffers.DrawArgs(1));
-            cmd.SetGlobalBuffer("MeshDataVertex", _tessellationMeshBuffer.VertexBuffer);
-            cmd.SetGlobalBuffer("MeshDataIndex", _tessellationMeshBuffer.IndexBuffer);
-            cmd.SetGlobalBuffer("LeafVertex", _leafMesh.Vertices);
-            cmd.SetGlobalBuffer("LeafIndex", _leafMesh.Indices);
+            computeCmd.SetExecutionFlags(CommandBufferExecutionFlags.AsyncCompute);
+            
+            computeCmd.SetGlobalBuffer("SubdBufferIn", _pingPongCounter == 0 ? _subdBuffers.SubdIn : _subdBuffers.SubdOut);
+            computeCmd.SetGlobalBuffer("SubdBufferOut", _pingPongCounter == 0 ? _subdBuffers.SubdOut : _subdBuffers.SubdIn);
+            computeCmd.SetGlobalBuffer("SubdBufferOutCulled", _subdBuffers.SubdOutCulled);
+            computeCmd.SetGlobalBuffer("PrepassVertexOut", _subdCulledBuffIdx == 0 ? _subdBuffers.PrepassV(0) : _subdBuffers.PrepassV(1));
+            computeCmd.SetGlobalBuffer("PrepassIndexOut", _subdCulledBuffIdx == 0 ? _subdBuffers.PrepassIdx(0) : _subdBuffers.PrepassIdx(1));
+            computeCmd.SetGlobalBuffer("SubdCounter", _subdBuffers.SubdCounter);
+            computeCmd.SetGlobalBuffer("DrawArgs", _subdCulledBuffIdx == 0 ? _subdBuffers.DrawArgs(0) : _subdBuffers.DrawArgs(1));
+            computeCmd.SetGlobalBuffer("MeshDataVertex", _tessellationMeshBuffer.VertexBuffer);
+            computeCmd.SetGlobalBuffer("MeshDataIndex", _tessellationMeshBuffer.IndexBuffer);
+            computeCmd.SetGlobalBuffer("LeafVertex", _leafMesh.Vertices);
+            computeCmd.SetGlobalBuffer("LeafIndex", _leafMesh.Indices);
 
             _frameCB.Update();
             
-            cmd.SetGlobalConstantBuffer(_objectCB.Cb, "UnityObjectData", 0, Marshal.SizeOf<ObjectData>());
-            cmd.SetGlobalConstantBuffer(_tessellationParam.Buffer, "UnityTessellationData", 0, Marshal.SizeOf<TessellationParams.ConstantBuffer>());
-            cmd.SetGlobalConstantBuffer(_frameCB.Buffer, "UnityPerFrameData", 0, Marshal.SizeOf<PerFrameData>());
+            computeCmd.DispatchCompute(_updateCS, kernelHandleUpd, 10000, 1, 1);
+            computeCmd.DispatchCompute(_vsPrepassCS, kernelHandlePrepass, 65000, 1, 1);
+            computeCmd.DispatchCompute(_copyDrawCS, kernelHandleCopyDraw, 1, 1, 1);
 
-            cmd.DispatchCompute(_updateCS, kernelHandleUpd, 10000, 1, 1);
-            cmd.DispatchCompute(_vsPrepassCS, kernelHandlePrepass, 65000, 1, 1);
-            cmd.DispatchCompute(_copyDrawCS, kernelHandleCopyDraw, 1, 1, 1);
+            Graphics.ExecuteCommandBufferAsync(computeCmd, ComputeQueueType.Urgent);
 
-            cmd.DrawProceduralIndirect(Matrix4x4.identity, _material, 0, MeshTopology.Triangles, _subdBuffers.DrawArgs(0));
+            CommandBuffer drawCmd = new CommandBuffer() { name = "Adaptive Tessellation Draw" };
+            
+            drawCmd.SetGlobalBuffer("PrepassVertexOut", _subdCulledBuffIdx == 0 ? _subdBuffers.PrepassV(1) : _subdBuffers.PrepassV(0));
+            drawCmd.SetGlobalBuffer("PrepassIndexOut", _subdCulledBuffIdx == 0 ? _subdBuffers.PrepassIdx(1) : _subdBuffers.PrepassIdx(0));
+            
+            drawCmd.SetGlobalConstantBuffer(_objectCB.Cb, "UnityObjectData", 0, Marshal.SizeOf<ObjectData>());
+            drawCmd.SetGlobalConstantBuffer(_tessellationParam.Buffer, "UnityTessellationData", 0, Marshal.SizeOf<TessellationParams.ConstantBuffer>());
+            drawCmd.SetGlobalConstantBuffer(_frameCB.Buffer, "UnityPerFrameData", 0, Marshal.SizeOf<PerFrameData>());
+            
+            drawCmd.DrawProceduralIndirect(Matrix4x4.identity, _material, 0, MeshTopology.Triangles,
+                _subdCulledBuffIdx == 0 ? _subdBuffers.DrawArgs(1) : _subdBuffers.DrawArgs(0));
 
-            Graphics.ExecuteCommandBuffer(cmd);
-
+            Graphics.ExecuteCommandBuffer(drawCmd);
+            
             _pingPongCounter = 1 - _pingPongCounter;
 
-            cmd.Release();
+            computeCmd.Release();
+            drawCmd.Release();
         }
 
         private void OnDestroy()
@@ -91,7 +104,6 @@ namespace AV.AsyncComputeTessellation
             _tessellationMeshBuffer.Dispose();
             _tessellationParam.Dispose();
             _leafMesh.Dispose();
-            
             _objectCB.Dispose();
             _frameCB.Dispose();
         }

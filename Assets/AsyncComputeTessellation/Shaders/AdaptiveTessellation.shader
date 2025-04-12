@@ -67,8 +67,6 @@ Shader "Unlit/AdaptiveTessellation" {
                 float wireframe_factor = gridFactor(i.LeafPos, 0.5);
 
                 return float4(c.xyz * wireframe_factor, 1);
-
-                return fixed4(i.TexC, 0, 1);
             }
             ENDCG
         }
