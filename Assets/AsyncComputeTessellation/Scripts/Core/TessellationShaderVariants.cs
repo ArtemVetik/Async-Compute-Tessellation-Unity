@@ -11,16 +11,16 @@ namespace AV.AsyncComputeTessellation
             _shaders = shaders;
         }
         
-        public void UpdateKeywords(in TessellationParamCB tessellationParams)
+        public void UpdateKeywords(in TessellationParams tessellationParams)
         {
             foreach (var shader in _shaders)
             {
-                if (tessellationParams.Data.UseDisplaceMapping)
+                if (tessellationParams.UseDisplaceMapping)
                     shader.EnableKeyword("USE_DISPLACE");
                 else
                     shader.DisableKeyword("USE_DISPLACE");
                 
-                if (tessellationParams.Data.Uniform)
+                if (tessellationParams.Uniform)
                     shader.EnableKeyword("UNIFORM_TESSELLATION");
                 else
                     shader.DisableKeyword("UNIFORM_TESSELLATION");

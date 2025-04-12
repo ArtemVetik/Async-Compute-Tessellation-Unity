@@ -1,18 +1,28 @@
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using System.Runtime.InteropServices;
 
 namespace AV.AsyncComputeTessellation
 {
-    public class DrawPipeline : MonoBehaviour
+    internal enum RenderMode
+    {
+        Direct = 0,
+        AsyncCompute = 1
+    }
+    
+    internal class DrawPipeline : MonoBehaviour
     {
         [SerializeField] private ComputeShader _updateCS;
         [SerializeField] private ComputeShader _copyDrawCS;
         [SerializeField] private ComputeShader _vsPrepassCS;
         [SerializeField] private Mesh _mesh;
         [SerializeField] private Material _material;
-        [SerializeField] private TessellationParamUI _ui;
+        [SerializeField] private TessellationParamUI _tessellationParamUi;
+        [SerializeField] private RenderParamUI _renderParamUi;
 
+        public RenderMode RenderMode = RenderMode.Direct;
+        
         private int _pingPongCounter = 0;
         private int _subdCulledBuffIdx = 0;
 
@@ -24,6 +34,8 @@ namespace AV.AsyncComputeTessellation
         private ObjectCB _objectCB;
         private FrameCB _frameCB;
 
+        public ref TessellationParams TessellationParams => ref _tessellationParam.Data;
+        
         private void Start()
         {
             _subdBuffers = new SubdivisionBuffers();
@@ -33,30 +45,36 @@ namespace AV.AsyncComputeTessellation
             _tessellationMeshBuffer.Build(_mesh);
             
             _tessellationParam = new TessellationParamCB(_tessellationMeshBuffer);
+            _tessellationParam.UploadData();
             
             _leafMesh = new LeafMesh();
             _leafMesh.Build(_tessellationParam.Data.CPULodLevel, ref _tessellationParam.Data.CB.IndicesCount, ref _tessellationParam.Data.CB.TrianglesCount);
 
             _shaderVariants = new TessellationShaderVariants(new[] { _updateCS, _vsPrepassCS, _copyDrawCS });
-            _shaderVariants.UpdateKeywords(_tessellationParam);
+            _shaderVariants.UpdateKeywords(_tessellationParam.Data);
 
             _objectCB = new ObjectCB();
             _frameCB = new FrameCB();
             
-            _ui.Initialize(_tessellationParam, _leafMesh, _shaderVariants);
+            _tessellationParamUi.Initialize(this);
+            _renderParamUi.Initialize(this);
         }
 
         private void OnRenderObject()
         {
-            _subdCulledBuffIdx = 1 - _subdCulledBuffIdx;
+            if (RenderMode == RenderMode.AsyncCompute)
+                _subdCulledBuffIdx = 1 - _subdCulledBuffIdx;
+            else
+                _subdCulledBuffIdx = 0;
             
             int kernelHandleUpd = _updateCS.FindKernel("main");
             int kernelHandlePrepass = _vsPrepassCS.FindKernel("main");
             int kernelHandleCopyDraw = _copyDrawCS.FindKernel("main");
 
-            CommandBuffer computeCmd = new CommandBuffer { name = "Adaptive Tessellation" };
+            CommandBuffer computeCmd = new CommandBuffer { name = "Adaptive Tessellation Compute" };
 
-            computeCmd.SetExecutionFlags(CommandBufferExecutionFlags.AsyncCompute);
+            if (RenderMode == RenderMode.AsyncCompute)
+                computeCmd.SetExecutionFlags(CommandBufferExecutionFlags.AsyncCompute);
             
             computeCmd.SetGlobalBuffer("SubdBufferIn", _pingPongCounter == 0 ? _subdBuffers.SubdIn : _subdBuffers.SubdOut);
             computeCmd.SetGlobalBuffer("SubdBufferOut", _pingPongCounter == 0 ? _subdBuffers.SubdOut : _subdBuffers.SubdIn);
@@ -76,9 +94,18 @@ namespace AV.AsyncComputeTessellation
             computeCmd.DispatchCompute(_vsPrepassCS, kernelHandlePrepass, 65000, 1, 1);
             computeCmd.DispatchCompute(_copyDrawCS, kernelHandleCopyDraw, 1, 1, 1);
 
-            Graphics.ExecuteCommandBufferAsync(computeCmd, ComputeQueueType.Urgent);
+            if (RenderMode == RenderMode.AsyncCompute)
+                Graphics.ExecuteCommandBufferAsync(computeCmd, ComputeQueueType.Urgent);
 
-            CommandBuffer drawCmd = new CommandBuffer() { name = "Adaptive Tessellation Draw" };
+            CommandBuffer drawCmd = null;
+            
+            if (RenderMode == RenderMode.AsyncCompute)
+                drawCmd = new CommandBuffer() { name = "Adaptive Tessellation Draw" };
+            else
+                drawCmd = computeCmd;
+
+            if (RenderMode != RenderMode.AsyncCompute)
+                _subdCulledBuffIdx = 1;
             
             drawCmd.SetGlobalBuffer("PrepassVertexOut", _subdCulledBuffIdx == 0 ? _subdBuffers.PrepassV(1) : _subdBuffers.PrepassV(0));
             drawCmd.SetGlobalBuffer("PrepassIndexOut", _subdCulledBuffIdx == 0 ? _subdBuffers.PrepassIdx(1) : _subdBuffers.PrepassIdx(0));
@@ -95,7 +122,9 @@ namespace AV.AsyncComputeTessellation
             _pingPongCounter = 1 - _pingPongCounter;
 
             computeCmd.Release();
-            drawCmd.Release();
+            
+            if (RenderMode == RenderMode.AsyncCompute)
+                drawCmd.Release();
         }
 
         private void OnDestroy()
@@ -106,6 +135,27 @@ namespace AV.AsyncComputeTessellation
             _leafMesh.Dispose();
             _objectCB.Dispose();
             _frameCB.Dispose();
+        }
+
+        public void ResetBuffers()
+        {
+            _subdBuffers.Build(_mesh.GetIndices(0).Length / 3);
+            _tessellationMeshBuffer.Build(_mesh);
+        }
+
+        public void UpdateKeywords()
+        {
+            _shaderVariants.UpdateKeywords(_tessellationParam.Data);
+        }
+
+        public void UpdateLeafMesh()
+        {
+            _leafMesh.Build(_tessellationParam.Data.CPULodLevel, ref _tessellationParam.Data.CB.IndicesCount, ref _tessellationParam.Data.CB.TrianglesCount);
+        }
+
+        public void InitTessellationData()
+        {
+            _tessellationParam.UploadData();
         }
     }
 }

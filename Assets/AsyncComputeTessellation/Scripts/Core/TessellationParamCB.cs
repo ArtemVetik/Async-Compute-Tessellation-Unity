@@ -39,8 +39,6 @@ namespace AV.AsyncComputeTessellation
                 1,
                 Marshal.SizeOf<TessellationParams.ConstantBuffer>(),
                 ComputeBufferType.Constant) { name = "TessellationCB" };
-            
-            UploadData();
         }
 
         public ref TessellationParams Data => ref _data;

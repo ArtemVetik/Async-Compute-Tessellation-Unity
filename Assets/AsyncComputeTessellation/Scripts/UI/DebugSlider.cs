@@ -23,7 +23,7 @@ namespace AV.AsyncComputeTessellation
             _slider.onValueChanged.RemoveListener(OnValueChanged);
         }
 
-        public DebugSlider Setup(string sliderName, float min, float max, bool wholeNumbers = false)
+        public void Setup(string sliderName, float min, float max, bool wholeNumbers = false)
         {
             _nameText.text = sliderName;
             _slider.minValue = min;
@@ -31,8 +31,6 @@ namespace AV.AsyncComputeTessellation
             _slider.wholeNumbers = wholeNumbers;
 
             _changedValue = null;
-
-            return this;
         }
 
         public bool UpdateValue(ref float value)

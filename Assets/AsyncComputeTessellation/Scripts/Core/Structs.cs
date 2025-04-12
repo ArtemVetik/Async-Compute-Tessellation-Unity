@@ -21,6 +21,12 @@ namespace AV.AsyncComputeTessellation
     
     public struct TessellationParams
     {
+        public enum MeshMode
+        {
+            Terrain, Mesh
+        }
+        
+        public MeshMode Mesh;
         public bool WireframeMode;
         public bool FlatNormals;
         public int CPULodLevel;
