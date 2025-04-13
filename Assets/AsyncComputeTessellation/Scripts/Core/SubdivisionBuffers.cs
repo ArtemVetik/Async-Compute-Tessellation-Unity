@@ -51,16 +51,18 @@ namespace AV.AsyncComputeTessellation
             for (int i = 0; i < trianglesCount; i++)
                 subdData[i] = new uint4(0, 0x1, (uint)i * 3, 1);
 
-            _subdIn.SetData(subdData);
+            _subdIn.SetData(subdData, 0, 0, trianglesCount);
 
             for (int i = 0; i < trianglesCount; i++)
                 subdData[i] = new uint4(0, 0, 0, 0);
 
-            _subdOut.SetData(subdData);
+            _subdOut.SetData(subdData, 0, 0, trianglesCount);
 
             var counterData = new NativeArray<uint>(4, Allocator.Temp);
             counterData[0] = (uint)trianglesCount;
-            counterData[1] = counterData[2] = counterData[3] = 0;
+            counterData[1] = 0;
+            counterData[2] = 0;
+            counterData[3] = 0;
 
             _subdCounter.SetData(counterData);
         }

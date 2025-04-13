@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using System.Runtime.InteropServices;
@@ -16,7 +15,8 @@ namespace AV.AsyncComputeTessellation
         [SerializeField] private ComputeShader _updateCS;
         [SerializeField] private ComputeShader _copyDrawCS;
         [SerializeField] private ComputeShader _vsPrepassCS;
-        [SerializeField] private Mesh _mesh;
+        [SerializeField] private Mesh _terrainMesh;
+        [SerializeField] private Mesh _modelMesh;
         [SerializeField] private Material _material;
         [SerializeField] private TessellationParamUI _tessellationParamUi;
         [SerializeField] private RenderParamUI _renderParamUi;
@@ -39,12 +39,10 @@ namespace AV.AsyncComputeTessellation
         private void Start()
         {
             _subdBuffers = new SubdivisionBuffers();
-            _subdBuffers.Build(_mesh.GetIndices(0).Length / 3);
-
             _tessellationMeshBuffer = new TesselationMeshBuffer();
-            _tessellationMeshBuffer.Build(_mesh);
-            
             _tessellationParam = new TessellationParamCB(_tessellationMeshBuffer);
+
+            ResetBuffers();
             _tessellationParam.UploadData();
             
             _leafMesh = new LeafMesh();
@@ -91,7 +89,7 @@ namespace AV.AsyncComputeTessellation
             _frameCB.Update();
             
             computeCmd.DispatchCompute(_updateCS, kernelHandleUpd, 10000, 1, 1);
-            computeCmd.DispatchCompute(_vsPrepassCS, kernelHandlePrepass, 65000, 1, 1);
+            computeCmd.DispatchCompute(_vsPrepassCS, kernelHandlePrepass, 65535, 1, 1);
             computeCmd.DispatchCompute(_copyDrawCS, kernelHandleCopyDraw, 1, 1, 1);
 
             if (RenderMode == RenderMode.AsyncCompute)
@@ -139,8 +137,14 @@ namespace AV.AsyncComputeTessellation
 
         public void ResetBuffers()
         {
-            _subdBuffers.Build(_mesh.GetIndices(0).Length / 3);
-            _tessellationMeshBuffer.Build(_mesh);
+            var mesh = _tessellationParam.Data.Mesh == TessellationParams.MeshMode.Mesh
+                ? _modelMesh
+                : _terrainMesh;
+            
+            _subdBuffers.Build(mesh.GetIndices(0).Length / 3);
+            _tessellationMeshBuffer.Build(mesh);
+
+            _pingPongCounter = 0;
         }
 
         public void UpdateKeywords()

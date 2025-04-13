@@ -15,7 +15,7 @@ namespace AV.AsyncComputeTessellation
         {
             foreach (var shader in _shaders)
             {
-                if (tessellationParams.UseDisplaceMapping)
+                if (tessellationParams.UseDisplaceMapping && tessellationParams.Mesh == TessellationParams.MeshMode.Terrain)
                     shader.EnableKeyword("USE_DISPLACE");
                 else
                     shader.DisableKeyword("USE_DISPLACE");
